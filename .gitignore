@@ -1,0 +1,9 @@
+/library_api/__pycache__/
+/library_api/load_data/.~lock.authors.json#
+/library_api/load_data/__pycache__/
+/library_api/load_data/authors.json
+/library_api/load_data/books.json
+/library_api/management/
+/library_api/migrations/
+/system_authors_books/__pycache__/
+
