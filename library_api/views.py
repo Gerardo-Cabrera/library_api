@@ -9,6 +9,8 @@ from django.db.models import Q, Max
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Book, Author, Favorite
 from .serializers import BookSerializer, AuthorSerializer, FavoriteSerializer, RegisterSerializer
+from django.db import transaction, IntegrityError
+from django.core.exceptions import ValidationError
 
 
 # Authors and books
@@ -25,14 +27,36 @@ class BookViewSet(viewsets.ModelViewSet):
         return self.queryset.get(book_id=book_id)
 
     def perform_create(self, serializer):
-        # Get the current maximum value of book_id
-        max_book_id = Book.objects.aggregate(max_id=Max('book_id'))['max_id']
-        if max_book_id is None:
-            max_book_id = 0
-        # Increase the value by 1
-        new_book_id = int(max_book_id) + 1
-        # Add the new book_id to the book before saving
-        serializer.save(book_id=str(new_book_id))
+        try:
+            with transaction.atomic():
+                # Get the current maximum value of book_id
+                max_book_id = Book.objects.aggregate(max_id=Max('book_id'))['max_id']
+                if max_book_id is None:
+                    max_book_id = 0
+
+                # Increase the value
+                new_book_id = str(int(max_book_id) + 1)
+                while Book.objects.filter(book_id=new_book_id).exists():
+                    new_book_id = str(int(new_book_id) + 1)
+
+                # Add the new book_id to the book before saving
+                serializer.save(book_id=new_book_id)
+        except IntegrityError as e:
+            raise ValidationError(f"Integrity error: {str(e)}")
+        except Exception as e:
+            raise ValidationError(f"An error occurred: {str(e)}")
+        
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        return Response({"message": "Book added successfully!", "data": response.data}, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        return Response({"message": "Book updated successfully!", "data": response.data}, status=status.HTTP_200_OK)
+        
+    def destroy(self, request, *args, **kwargs):
+        super().destroy(request, *args, **kwargs)
+        return Response({"message": "Book deleted successfully!"}, status=status.HTTP_204_NO_CONTENT)
 
     def get_permissions(self):
         if self.request.method in ['POST', 'PUT', 'DELETE']:
@@ -52,14 +76,36 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return self.queryset.get(author_id=author_id)
 
     def perform_create(self, serializer):
-        # Get the current maximum value of author_id
-        max_author_id = Author.objects.aggregate(max_id=Max('author_id'))['max_id']
-        if max_author_id is None:
-            max_author_id = 0
-        # Increase the value by 1
-        new_author_id = int(max_author_id) + 1
-        # Add the new author_id to the author before saving
-        serializer.save(author_id=str(new_author_id))
+        try:
+            with transaction.atomic():
+                # Get the current maximum value of author_id
+                max_author_id = Author.objects.aggregate(max_id=Max('author_id'))['max_id']
+                if max_author_id is None:
+                    max_author_id = 0
+
+                # Increase the value
+                new_author_id = str(int(max_author_id) + 1)
+                while Author.objects.filter(author_id=new_author_id).exists():
+                    new_author_id = str(int(new_author_id) + 1)
+
+                # Add the new author_id to the author before saving
+                serializer.save(author_id=new_author_id)
+        except IntegrityError as e:
+            raise ValidationError(f"Integrity error: {str(e)}")
+        except Exception as e:
+            raise ValidationError(f"An error occurred: {str(e)}")
+        
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        return Response({"message": "Author added successfully!", "data": response.data}, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        return Response({"message": "Author updated successfully!", "data": response.data}, status=status.HTTP_200_OK)
+        
+    def destroy(self, request, *args, **kwargs):
+        super().destroy(request, *args, **kwargs)
+        return Response({"message": "Author deleted successfully!"}, status=status.HTTP_204_NO_CONTENT)
 
     def get_permissions(self):
         if self.request.method in ['POST', 'PUT', 'DELETE']:
@@ -69,8 +115,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
 # Favorites
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def add_to_favorites(request, book_id):
+def add_to_favorites(request):
     try:
+        book_id = request.data.get('book_id')
         book = Book.objects.get(id=book_id)
     except Book.DoesNotExist:
         return Response({"detail": "Book not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -114,17 +161,6 @@ def recommend_books(user):
 @api_view(['POST'])
 @permission_classes([AllowAny]) 
 def register(request):
-    # username = request.data.get('username')
-    # password = request.data.get('password')
-    # if username and password:
-    #     user = User.objects.create_user(username=username, password=password)
-    #     refresh = RefreshToken.for_user(user)
-    #     return Response({
-    #         'refresh': str(refresh),
-    #         'access': str(refresh.access_token),
-    #     }, status=status.HTTP_201_CREATED)
-    # return Response({"error": "Invalid data"}, status=status.HTTP_400_BAD_REQUEST)
-
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
@@ -134,10 +170,6 @@ def register(request):
 @api_view(['POST'])
 @permission_classes([AllowAny]) 
 def login(request):
-    # username = request.data.get('username')
-    # password = request.data.get('password')
-    # user = authenticate(username=username, password=password)
-
     email = request.data.get('email')
     password = request.data.get('password')
     user = authenticate(email=email, password=password)
@@ -145,7 +177,7 @@ def login(request):
     if user:
         refresh = RefreshToken.for_user(user)
         return Response({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
+            'refresh_token': str(refresh),
+            'access_token': str(refresh.access_token),
         })
     return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)

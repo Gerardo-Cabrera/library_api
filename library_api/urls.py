@@ -11,6 +11,6 @@ urlpatterns = [
     path('register/', register, name='register'),
     path('login/', login, name='login'),
     path('favorites/', list_favorites, name='list_favorites'),
-    path('favorites/add/<int:book_id>/', add_to_favorites, name='add_to_favorites'),
+    path('favorites/add/', add_to_favorites, name='add_to_favorites'),
     path('recommended-books/', recommended_books, name='recommended_books'),
 ]
