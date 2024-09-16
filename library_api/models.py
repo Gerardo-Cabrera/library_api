@@ -84,7 +84,6 @@ class Book(models.Model):
         ]
 
 class Favorite(models.Model):
-    #user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="favorites")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     book = models.ForeignKey(Book, on_delete=models.CASCADE)
 
